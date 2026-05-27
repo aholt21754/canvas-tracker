@@ -430,7 +430,7 @@
       <option value="all">All</option>
       <option value="done">Completed</option>
     </select>
-    <button class="refresh-btn" onclick="fetchAssignments()"><i class="ti ti-refresh" style="font-size:13px"></i> Refresh</button>
+    <button class="refresh-btn" onclick="fetchAssignments(true)"><i class="ti ti-refresh" style="font-size:13px"></i> Refresh</button>
     <button class="refresh-btn" onclick="clearSavedData()" style="color:var(--color-danger-text);border-color:var(--color-danger-border)" title="Clear saved token and tasks"><i class="ti ti-trash" style="font-size:13px"></i> Clear saved data</button>
   </div>
 
@@ -533,12 +533,14 @@ async function fetchAllPages(path) {
   return all;
 }
 
-async function fetchAssignments() {
-  setStatus('loading', 'Loading assignments...');
+async function fetchAssignments(refreshOnly = false) {
+  setStatus('loading', refreshOnly ? 'Refreshing...' : 'Loading assignments...');
   try {
-    const courseList = await canvasFetch('/courses?enrollment_state=active&per_page=50');
-    courses = {};
-    courseList.forEach(c => { if (c.name) courses[c.id] = c.name; });
+    if (!refreshOnly) {
+      const courseList = await canvasFetch('/courses?enrollment_state=active&per_page=50');
+      courses = {};
+      courseList.forEach(c => { if (c.name) courses[c.id] = c.name; });
+    }
 
     const upcoming = await fetchAllPages('/users/self/upcoming_events?per_page=50');
     let missing = [];
@@ -574,11 +576,13 @@ async function fetchAssignments() {
       }
     });
 
-    populateCourseFilter();
-    populatePersonalCourseSelect();
-    document.getElementById('setupBanner').style.display = 'none';
-    document.getElementById('controlsRow').style.display = 'flex';
-    document.getElementById('addSection').style.display = 'block';
+    if (!refreshOnly) {
+      populateCourseFilter();
+      populatePersonalCourseSelect();
+      document.getElementById('setupBanner').style.display = 'none';
+      document.getElementById('controlsRow').style.display = 'flex';
+      document.getElementById('addSection').style.display = 'block';
+    }
     setStatus('connected', `Connected — ${assignments.length} assignments`);
     renderTasks();
   } catch(e) {
