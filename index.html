@@ -269,6 +269,18 @@
   .points-badge { font-size: 11px; color: var(--text-tertiary); }
   .lock-badge { font-size: 11px; color: var(--color-warning-text); }
   .tag-missing { font-size: 11px; color: var(--color-danger-text); }
+  .missing-sub-header {
+    font-size: 12px; font-weight: 500; color: var(--text-secondary);
+    margin: 1rem 0 0.5rem; padding-left: 2px; text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .missing-section-header {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 500; color: var(--color-danger-text);
+    margin: 2rem 0 0.75rem;
+    padding-top: 1.25rem;
+    border-top: 0.5px solid var(--color-danger-border);
+  }
   .tag-personal { font-size: 11px; color: var(--color-info-text); }
 
   .add-section {
@@ -640,22 +652,32 @@ function renderTasks() {
   if (statusFilter === 'pending') all = all.filter(t => !completedIds.has(t.id));
   if (statusFilter === 'done') all = all.filter(t => completedIds.has(t.id));
 
-  all.sort((a, b) => {
+  // Split into upcoming/personal and overdue/missing
+  const now = new Date();
+  const upcoming = all.filter(t => t.source !== 'missing' && (!t.due_at || new Date(t.due_at) >= now));
+  const overdueMissing = all.filter(t => t.source === 'missing' || (t.due_at && new Date(t.due_at) < now && t.source === 'canvas'));
+
+  const sortByDate = (a, b) => {
     if (!a.due_at && !b.due_at) return 0;
     if (!a.due_at) return 1;
     if (!b.due_at) return -1;
     return new Date(a.due_at) - new Date(b.due_at);
-  });
+  };
+  upcoming.sort(sortByDate);
+  overdueMissing.sort(sortByDate);
 
-  const grouped = {};
-  all.forEach(t => {
-    const key = t.due_at ? new Date(t.due_at).toDateString() : 'No due date';
-    if (!grouped[key]) grouped[key] = [];
-    grouped[key].push(t);
-  });
+  const groupByDate = (items) => {
+    const grouped = {};
+    items.forEach(t => {
+      const key = t.due_at ? new Date(t.due_at).toDateString() : 'No due date';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(t);
+    });
+    return grouped;
+  };
 
   const pending = assignments.filter(t => !completedIds.has(t.id));
-  const overdue = pending.filter(t => t.due_at && daysUntil(t.due_at) < 0);
+  const overdueCount = pending.filter(t => t.due_at && daysUntil(t.due_at) < 0).length;
   const thisWeek = pending.filter(t => { const d = daysUntil(t.due_at); return d !== null && d >= 0 && d <= 7; });
 
   const strip = document.getElementById('summaryStrip');
@@ -664,54 +686,94 @@ function renderTasks() {
     strip.innerHTML =
       `<div class="summary-chip"><span>${pending.length}</span> pending</div>` +
       `<div class="summary-chip"><span>${thisWeek.length}</span> due this week</div>` +
-      (overdue.length > 0 ? `<div class="summary-chip danger"><span>${overdue.length}</span> overdue</div>` : '') +
+      (overdueCount > 0 ? `<div class="summary-chip danger"><span>${overdueCount}</span> overdue</div>` : '') +
       `<div class="summary-chip"><span>${Object.keys(courses).length}</span> courses</div>`;
   }
 
   const list = document.getElementById('taskList');
-  if (Object.keys(grouped).length === 0) {
+  if (upcoming.length === 0 && overdueMissing.length === 0) {
     list.innerHTML = '<div class="empty-state"><i class="ti ti-mood-happy"></i>Nothing to show here</div>';
     return;
   }
 
-  list.innerHTML = Object.entries(grouped).map(([dateKey, tasks]) => {
-    const days = tasks[0].due_at ? daysUntil(tasks[0].due_at) : null;
-    const label = tasks[0].due_at ? formatDueDate(tasks[0].due_at) : 'No due date';
-    const away = daysAwayLabel(days);
-
-    const cards = tasks.map(t => {
-      const done = completedIds.has(t.id);
-      const courseName = t.course_id ? (courses[t.course_id] || '') : '';
-      const icon = t.source === 'personal' ? 'ti-pencil' : getIcon(t.submission_types);
-      const time = formatTime(t.due_at);
-      const lockLabel = t.lock_at ? formatLockDate(t.lock_at) : '';
-      const extraClass = t.source === 'missing' ? 'missing' : t.source === 'personal' ? 'personal' : '';
-      return `<div class="task-card ${done ? 'done' : ''} ${extraClass}">
-        <div class="task-check ${done ? 'checked' : ''}" onclick="toggleDone('${t.id}')" role="checkbox" aria-checked="${done}" aria-label="Mark complete" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')toggleDone('${t.id}')"></div>
-        <i class="ti ${icon} task-type-icon" aria-hidden="true"></i>
-        <div class="task-body">
-          <div class="task-title">${escHtml(t.title)}</div>
-          <div class="task-meta">
-            ${courseName ? `<span class="course-badge">${escHtml(shortenName(courseName, 36))}</span>` : ''}
-            ${time ? `<span class="time-badge"><i class="ti ti-clock" aria-hidden="true" style="font-size:11px;vertical-align:-1px"></i> ${time}</span>` : ''}
-            ${lockLabel ? `<span class="lock-badge"><i class="ti ti-lock" aria-hidden="true" style="font-size:11px;vertical-align:-1px"></i> closes ${lockLabel}</span>` : ''}
-            ${t.points ? `<span class="points-badge">${t.points} pts</span>` : ''}
-            ${t.source === 'missing' && !done ? `<span class="tag-missing">missing</span>` : ''}
-            ${t.source === 'personal' ? `<span class="tag-personal">personal</span>` : ''}
-          </div>
+  function renderTaskCard(t) {
+    const done = completedIds.has(t.id);
+    const courseName = t.course_id ? (courses[t.course_id] || '') : '';
+    const icon = t.source === 'personal' ? 'ti-pencil' : getIcon(t.submission_types);
+    const time = formatTime(t.due_at);
+    const lockLabel = t.lock_at ? formatLockDate(t.lock_at) : '';
+    const extraClass = t.source === 'missing' ? 'missing' : t.source === 'personal' ? 'personal' : '';
+    return `<div class="task-card ${done ? 'done' : ''} ${extraClass}">
+      <div class="task-check ${done ? 'checked' : ''}" onclick="toggleDone('${t.id}')" role="checkbox" aria-checked="${done}" aria-label="Mark complete" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')toggleDone('${t.id}')"></div>
+      <i class="ti ${icon} task-type-icon" aria-hidden="true"></i>
+      <div class="task-body">
+        <div class="task-title">${escHtml(t.title)}</div>
+        <div class="task-meta">
+          ${courseName ? `<span class="course-badge">${escHtml(shortenName(courseName, 36))}</span>` : ''}
+          ${time ? `<span class="time-badge"><i class="ti ti-clock" aria-hidden="true" style="font-size:11px;vertical-align:-1px"></i> ${time}</span>` : ''}
+          ${lockLabel ? `<span class="lock-badge"><i class="ti ti-lock" aria-hidden="true" style="font-size:11px;vertical-align:-1px"></i> closes ${lockLabel}</span>` : ''}
+          ${t.points ? `<span class="points-badge">${t.points} pts</span>` : ''}
+          ${t.source === 'missing' && !done ? `<span class="tag-missing">missing</span>` : ''}
+          ${t.source === 'personal' ? `<span class="tag-personal">personal</span>` : ''}
         </div>
+      </div>
+    </div>`;
+  }
+
+  function renderGroups(grouped) {
+    return Object.entries(grouped).map(([dateKey, tasks]) => {
+      const days = tasks[0].due_at ? daysUntil(tasks[0].due_at) : null;
+      const label = tasks[0].due_at ? formatDueDate(tasks[0].due_at) : 'No due date';
+      const away = daysAwayLabel(days);
+      return `<div class="date-group">
+        <div class="date-header">
+          <span class="date-label">${label}</span>
+          ${away.text ? `<span class="days-away ${away.cls}">${away.text}</span>` : ''}
+          <span class="date-count">${tasks.length} item${tasks.length !== 1 ? 's' : ''}</span>
+        </div>
+        ${tasks.map(renderTaskCard).join('')}
       </div>`;
     }).join('');
+  }
 
-    return `<div class="date-group">
-      <div class="date-header">
-        <span class="date-label">${label}</span>
-        ${away.text ? `<span class="days-away ${away.cls}">${away.text}</span>` : ''}
-        <span class="date-count">${tasks.length} item${tasks.length !== 1 ? 's' : ''}</span>
-      </div>
-      ${cards}
-    </div>`;
-  }).join('');
+  let html = '';
+
+  if (upcoming.length > 0) {
+    html += renderGroups(groupByDate(upcoming));
+  }
+
+  if (overdueMissing.length > 0) {
+    const visibleMissing = overdueMissing.filter(t => !completedIds.has(t.id));
+    if (visibleMissing.length > 0 || statusFilter === 'done') {
+      // Split: still submittable (lock_at in the future) vs fully closed
+      const stillOpen = overdueMissing
+        .filter(t => t.lock_at && new Date(t.lock_at) > now)
+        .sort((a, b) => new Date(a.lock_at) - new Date(b.lock_at));
+      const fullyClosed = overdueMissing
+        .filter(t => !t.lock_at || new Date(t.lock_at) <= now)
+        .sort(sortByDate);
+
+      html += `<div class="missing-section-header">
+        <i class="ti ti-alert-triangle" style="font-size:13px"></i>
+        Overdue & missing
+        <span style="font-weight:400;opacity:0.7">(${overdueMissing.length})</span>
+      </div>`;
+
+      if (stillOpen.length > 0) {
+        html += `<div class="missing-sub-header">Still accepting submissions</div>`;
+        html += renderGroups(groupByDate(stillOpen));
+      }
+
+      if (fullyClosed.length > 0) {
+        if (stillOpen.length > 0) {
+          html += `<div class="missing-sub-header">No longer accepting submissions</div>`;
+        }
+        html += renderGroups(groupByDate(fullyClosed));
+      }
+    }
+  }
+
+  list.innerHTML = html || '<div class="empty-state"><i class="ti ti-mood-happy"></i>Nothing to show here</div>';
 }
 
 function clearSavedData() {
