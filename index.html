@@ -340,6 +340,43 @@
 
   .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-tertiary); font-size: 14px; }
   .empty-state i { font-size: 32px; display: block; margin-bottom: 8px; }
+
+  @media (max-width: 520px) {
+    body { padding: 1rem 0.75rem; }
+
+    .header { flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 1rem; }
+    h1 { font-size: 18px; }
+
+    .setup-row { flex-direction: column; }
+    .setup-row input { min-width: unset; width: 100%; }
+    .setup-row button { width: 100%; justify-content: center; }
+
+    .controls { gap: 6px; }
+    .multi-select-trigger { min-width: unset; flex: 1; max-width: unset; }
+    .multi-select-dropdown {
+      left: 0; right: 0; max-width: unset; width: calc(100vw - 1.5rem);
+      max-height: 55vh; overflow-y: auto;
+    }
+    .refresh-btn { margin-left: 0; }
+
+    .task-check { width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0; }
+    .task-check.checked::after { width: 11px; height: 7px; }
+
+    .task-card { padding: 11px 12px; gap: 12px; }
+    .task-title { font-size: 14px; white-space: normal; line-height: 1.4; }
+
+    .add-row { flex-direction: column; }
+    .add-row input[type="text"] { width: 100%; min-width: unset; }
+    .add-row input[type="date"] { width: 100%; }
+    .add-row select { width: 100%; }
+    .add-row button { width: 100%; justify-content: center; }
+
+    .summary-strip { gap: 6px; }
+    .summary-chip { font-size: 11px; padding: 3px 8px; }
+    .course-badge { max-width: 150px; }
+
+    .date-label { font-size: 14px; }
+  }
 </style>
 </head>
 <body>
