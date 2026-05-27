@@ -173,6 +173,30 @@
     flex-wrap: wrap;
   }
   .filter-label { font-size: 12px; color: var(--text-secondary); }
+  .multi-select-wrap { position: relative; }
+  .multi-select-trigger {
+    display: inline-flex; align-items: center;
+    padding: 7px 10px; font-size: 13px; font-family: var(--font);
+    background: var(--bg-primary); border: 0.5px solid var(--border-mid);
+    border-radius: var(--radius-md); color: var(--text-primary);
+    cursor: pointer; white-space: nowrap; min-width: 130px; max-width: 220px;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .multi-select-trigger:hover { background: var(--bg-secondary); border-color: var(--border-strong); }
+  .multi-select-trigger span { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .multi-select-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 100;
+    background: var(--bg-primary); border: 0.5px solid var(--border-mid);
+    border-radius: var(--radius-md); padding: 6px 0; min-width: 220px; max-width: 300px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-height: 260px; overflow-y: auto;
+  }
+  .multi-select-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; font-size: 13px; color: var(--text-primary);
+    cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .multi-select-option:hover { background: var(--bg-secondary); }
+  .multi-select-option input[type="checkbox"] { cursor: pointer; flex-shrink: 0; }
   .refresh-btn { margin-left: auto; font-size: 12px; padding: 6px 10px; }
 
   .date-group { margin-bottom: 1.5rem; }
@@ -304,9 +328,18 @@
 
   <div class="controls" id="controlsRow" style="display:none">
     <span class="filter-label">Show:</span>
-    <select id="filterCourse" onchange="renderTasks()">
-      <option value="all">All courses</option>
-    </select>
+    <div class="multi-select-wrap" id="courseFilterWrap">
+      <div class="multi-select-trigger" id="courseFilterTrigger" onclick="toggleCourseDropdown()" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')toggleCourseDropdown()">
+        <span id="courseFilterLabel">All courses</span>
+        <i class="ti ti-chevron-down" style="font-size:12px;margin-left:4px"></i>
+      </div>
+      <div class="multi-select-dropdown" id="courseFilterDropdown" style="display:none">
+        <label class="multi-select-option">
+          <input type="checkbox" value="all" id="courseAll" onchange="handleCourseAll(this)" checked> All courses
+        </label>
+        <div id="courseOptions"></div>
+      </div>
+    </div>
     <select id="filterStatus" onchange="renderTasks()">
       <option value="pending">Pending</option>
       <option value="all">All</option>
@@ -452,14 +485,63 @@ function shortenName(name, max) {
 }
 
 function populateCourseFilter() {
-  const sel = document.getElementById('filterCourse');
-  sel.innerHTML = '<option value="all">All courses</option>';
+  const container = document.getElementById('courseOptions');
+  container.innerHTML = '';
   Object.entries(courses).forEach(([id, name]) => {
-    const opt = document.createElement('option');
-    opt.value = id;
-    opt.textContent = shortenName(name, 40);
-    sel.appendChild(opt);
+    const label = document.createElement('label');
+    label.className = 'multi-select-option';
+    label.innerHTML = `<input type="checkbox" value="${id}" onchange="handleCourseOption(this)" checked> ${escHtml(shortenName(name, 40))}`;
+    container.appendChild(label);
   });
+  updateCourseFilterLabel();
+}
+
+function toggleCourseDropdown() {
+  const dd = document.getElementById('courseFilterDropdown');
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+
+function handleCourseAll(cb) {
+  const boxes = document.querySelectorAll('#courseOptions input[type="checkbox"]');
+  boxes.forEach(b => b.checked = cb.checked);
+  updateCourseFilterLabel();
+  renderTasks();
+}
+
+function handleCourseOption(cb) {
+  const boxes = Array.from(document.querySelectorAll('#courseOptions input[type="checkbox"]'));
+  const allChecked = boxes.every(b => b.checked);
+  const noneChecked = boxes.every(b => !b.checked);
+  document.getElementById('courseAll').checked = allChecked;
+  if (noneChecked) { cb.checked = true; } // prevent deselecting all
+  updateCourseFilterLabel();
+  renderTasks();
+}
+
+function updateCourseFilterLabel() {
+  const boxes = Array.from(document.querySelectorAll('#courseOptions input[type="checkbox"]'));
+  const checked = boxes.filter(b => b.checked);
+  const label = document.getElementById('courseFilterLabel');
+  const allBox = document.getElementById('courseAll');
+  if (checked.length === 0 || checked.length === boxes.length) {
+    label.textContent = 'All courses';
+    allBox.checked = true;
+  } else if (checked.length === 1) {
+    const name = checked[0].closest('label').textContent.trim();
+    label.textContent = shortenName(name, 22);
+    allBox.checked = false;
+  } else {
+    label.textContent = `${checked.length} courses`;
+    allBox.checked = false;
+  }
+}
+
+function getSelectedCourseIds() {
+  const allBox = document.getElementById('courseAll');
+  if (!allBox) return null;
+  if (allBox.checked) return null; // null = all
+  const boxes = Array.from(document.querySelectorAll('#courseOptions input[type="checkbox"]'));
+  return boxes.filter(b => b.checked).map(b => b.value);
 }
 
 function populatePersonalCourseSelect() {
@@ -548,11 +630,13 @@ function toggleDone(id) {
 }
 
 function renderTasks() {
-  const courseFilter = document.getElementById('filterCourse').value;
+  const selectedCourses = getSelectedCourseIds();
   const statusFilter = document.getElementById('filterStatus').value;
 
   let all = [...assignments, ...personalTasks];
-  if (courseFilter !== 'all') all = all.filter(t => String(t.course_id) === String(courseFilter));
+  if (selectedCourses !== null) {
+    all = all.filter(t => t.course_id && selectedCourses.includes(String(t.course_id)));
+  }
   if (statusFilter === 'pending') all = all.filter(t => !completedIds.has(t.id));
   if (statusFilter === 'done') all = all.filter(t => completedIds.has(t.id));
 
@@ -644,6 +728,12 @@ function escHtml(str) {
 }
 
 document.getElementById('newTaskDate').value = new Date().toISOString().split('T')[0];
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('courseFilterWrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('courseFilterDropdown').style.display = 'none';
+  }
+});
 document.getElementById('domainInput').addEventListener('keydown', e => { if (e.key === 'Enter') connectCanvas(); });
 document.getElementById('tokenInput').addEventListener('keydown', e => { if (e.key === 'Enter') connectCanvas(); });
 
