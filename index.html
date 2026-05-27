@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canvas Task Tracker</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f0;
+    --bg-tertiary: #eeede8;
+    --text-primary: #1a1a18;
+    --text-secondary: #5f5e5a;
+    --text-tertiary: #888780;
+    --border-light: rgba(0,0,0,0.12);
+    --border-mid: rgba(0,0,0,0.22);
+    --border-strong: rgba(0,0,0,0.35);
+    --color-info-bg: #e6f1fb;
+    --color-info-border: rgba(24,95,165,0.35);
+    --color-info-text: #185fa5;
+    --color-danger-bg: #fcebeb;
+    --color-danger-border: rgba(163,45,45,0.35);
+    --color-danger-text: #a32d2d;
+    --color-warning-bg: #faeeda;
+    --color-warning-text: #854f0b;
+    --color-success-text: #3b6d11;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'SF Mono', 'Consolas', monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-primary: #1e1e1c;
+      --bg-secondary: #2a2a28;
+      --bg-tertiary: #323230;
+      --text-primary: #f0efe8;
+      --text-secondary: #b4b2a9;
+      --text-tertiary: #888780;
+      --border-light: rgba(255,255,255,0.1);
+      --border-mid: rgba(255,255,255,0.18);
+      --border-strong: rgba(255,255,255,0.28);
+      --color-info-bg: #0c2d4a;
+      --color-info-border: rgba(55,138,221,0.35);
+      --color-info-text: #85b7eb;
+      --color-danger-bg: #3d1a1a;
+      --color-danger-border: rgba(226,75,74,0.35);
+      --color-danger-text: #f09595;
+      --color-warning-bg: #3d2a0a;
+      --color-warning-text: #fac775;
+      --color-success-text: #97c459;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+  .app {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 0.5px solid var(--border-mid);
+    flex-shrink: 0;
+  }
+  .status-dot.connected { background: #639922; border-color: #3b6d11; }
+  .status-dot.loading { background: #ba7517; border-color: #854f0b; animation: pulse 1s infinite; }
+  .status-dot.error { background: #e24b4a; border-color: #a32d2d; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .card {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+  .card p { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.6; }
+  .setup-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; margin-bottom: 8px; }
+  .setup-row input {
+    flex: 1;
+    min-width: 180px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: var(--font);
+    background: var(--bg-secondary);
+    border: 0.5px solid var(--border-mid);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    outline: none;
+  }
+  .setup-row input:focus { border-color: var(--border-strong); }
+  .token-input { font-family: var(--font-mono) !important; font-size: 12px !important; }
+  .domain-note { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; margin-bottom: 0 !important; }
+  button {
+    padding: 8px 14px;
+    font-size: 13px;
+    font-family: var(--font);
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-mid);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  button:hover { background: var(--bg-secondary); border-color: var(--border-strong); }
+  button:active { transform: scale(0.98); }
+  select {
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: var(--font);
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-mid);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    outline: none;
+    cursor: pointer;
+  }
+  select:focus { border-color: var(--border-strong); }
+
+  .summary-strip { display: flex; gap: 10px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+  .summary-chip {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: var(--radius-md);
+    border: 0.5px solid var(--border-light);
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+  }
+  .summary-chip span { font-weight: 500; color: var(--text-primary); }
+  .summary-chip.danger { border-color: var(--color-danger-border); color: var(--color-danger-text); }
+  .summary-chip.danger span { color: var(--color-danger-text); }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .filter-label { font-size: 12px; color: var(--text-secondary); }
+  .refresh-btn { margin-left: auto; font-size: 12px; padding: 6px 10px; }
+
+  .date-group { margin-bottom: 1.5rem; }
+  .date-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 0.5px solid var(--border-light);
+  }
+  .date-label { font-size: 15px; font-weight: 500; color: var(--text-primary); }
+  .days-away { font-size: 12px; color: var(--text-tertiary); }
+  .days-away.overdue { color: var(--color-danger-text); }
+  .days-away.today { color: var(--color-warning-text); }
+  .days-away.soon { color: var(--color-info-text); }
+  .date-count { margin-left: auto; font-size: 12px; color: var(--text-tertiary); }
+
+  .task-card {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    transition: border-color 0.15s;
+  }
+  .task-card:hover { border-color: var(--border-mid); }
+  .task-card.done { opacity: 0.45; }
+  .task-card.done .task-title { text-decoration: line-through; }
+  .task-card.missing { border-left: 2px solid var(--color-danger-border); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+  .task-card.personal { border-left: 2px solid var(--color-info-border); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+
+  .task-check {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    border: 0.5px solid var(--border-mid);
+    flex-shrink: 0;
+    margin-top: 2px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+  }
+  .task-check.checked { background: var(--color-info-bg); border-color: var(--color-info-border); }
+  .task-check.checked::after {
+    content: '';
+    display: block;
+    width: 8px; height: 5px;
+    border-left: 1.5px solid var(--color-info-text);
+    border-bottom: 1.5px solid var(--color-info-text);
+    transform: rotate(-45deg) translateY(-1px);
+  }
+  .task-type-icon { font-size: 14px; color: var(--text-tertiary); flex-shrink: 0; margin-top: 2px; }
+  .task-body { flex: 1; min-width: 0; }
+  .task-title { font-size: 14px; color: var(--text-primary); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .course-badge {
+    font-size: 11px; padding: 2px 7px;
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 0.5px solid var(--border-light);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;
+  }
+  .time-badge { font-size: 11px; color: var(--text-tertiary); }
+  .points-badge { font-size: 11px; color: var(--text-tertiary); }
+  .lock-badge { font-size: 11px; color: var(--color-warning-text); }
+  .tag-missing { font-size: 11px; color: var(--color-danger-text); }
+  .tag-personal { font-size: 11px; color: var(--color-info-text); }
+
+  .add-section {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+    margin-top: 1.5rem;
+  }
+  .add-section h3 { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 10px; }
+  .add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .add-row input[type="text"] {
+    flex: 2; min-width: 160px;
+    padding: 7px 10px; font-size: 13px;
+    font-family: var(--font);
+    background: var(--bg-secondary);
+    border: 0.5px solid var(--border-mid);
+    border-radius: var(--radius-md);
+    color: var(--text-primary); outline: none;
+  }
+  .add-row input[type="date"] {
+    flex: 0 0 auto; width: 145px;
+    padding: 7px 10px; font-size: 13px;
+    font-family: var(--font);
+    background: var(--bg-secondary);
+    border: 0.5px solid var(--border-mid);
+    border-radius: var(--radius-md);
+    color: var(--text-primary); outline: none;
+  }
+  .add-row input:focus, .add-row select:focus { border-color: var(--border-strong); }
+
+  .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-tertiary); font-size: 14px; }
+  .empty-state i { font-size: 32px; display: block; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1><i class="ti ti-checklist"></i> Canvas task tracker</h1>
+    <div class="status-row">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Not connected</span>
+    </div>
+  </div>
+
+  <div class="card" id="setupBanner">
+    <p>Enter your Canvas domain and personal access token to load your assignments. Your token is only stored in this browser tab.</p>
+    <div class="setup-row">
+      <input type="text" id="domainInput" placeholder="yourschool.instructure.com" />
+      <input type="text" id="tokenInput" class="token-input" placeholder="Paste your Canvas access token" />
+      <button onclick="connectCanvas()"><i class="ti ti-plug"></i> Connect</button>
+    </div>
+    <p class="domain-note">Get your token: Canvas → Account → Settings → Approved Integrations → + New Access Token</p>
+  </div>
+
+  <div id="summaryStrip" class="summary-strip" style="display:none"></div>
+
+  <div class="controls" id="controlsRow" style="display:none">
+    <span class="filter-label">Show:</span>
+    <select id="filterCourse" onchange="renderTasks()">
+      <option value="all">All courses</option>
+    </select>
+    <select id="filterStatus" onchange="renderTasks()">
+      <option value="pending">Pending</option>
+      <option value="all">All</option>
+      <option value="done">Completed</option>
+    </select>
+    <button class="refresh-btn" onclick="fetchAssignments()"><i class="ti ti-refresh" style="font-size:13px"></i> Refresh</button>
+    <button class="refresh-btn" onclick="clearSavedData()" style="color:var(--color-danger-text);border-color:var(--color-danger-border)" title="Clear saved token and tasks"><i class="ti ti-trash" style="font-size:13px"></i> Clear saved data</button>
+  </div>
+
+  <div id="taskList"></div>
+
+  <div id="addSection" class="add-section" style="display:none">
+    <h3>Add a personal task</h3>
+    <div class="add-row">
+      <input type="text" id="newTaskTitle" placeholder="Task name..." />
+      <input type="date" id="newTaskDate" />
+      <select id="newTaskCourse"></select>
+      <button onclick="addPersonalTask()"><i class="ti ti-plus"></i> Add</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LS = {
+  get: (k, fallback) => { try { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : fallback; } catch(e) { return fallback; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
+};
+
+let canvasToken = LS.get('canvas_token', '');
+let canvasDomain = LS.get('canvas_domain', '');
+let assignments = [];
+let personalTasks = LS.get('personal_tasks', []);
+let courses = {};
+let completedIds = new Set(LS.get('completed_ids', []));
+
+function saveState() {
+  LS.set('personal_tasks', personalTasks);
+  LS.set('completed_ids', [...completedIds]);
+}
+
+function setStatus(state, text) {
+  document.getElementById('statusDot').className = 'status-dot ' + state;
+  document.getElementById('statusText').textContent = text;
+}
+
+async function connectCanvas() {
+  const domain = document.getElementById('domainInput').value.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const token = document.getElementById('tokenInput').value.trim();
+  if (!domain || !token) { alert('Please enter both your Canvas domain and access token.'); return; }
+  canvasDomain = domain;
+  canvasToken = token;
+  LS.set('canvas_domain', domain);
+  LS.set('canvas_token', token);
+  setStatus('loading', 'Connecting...');
+  await fetchAssignments();
+}
+
+async function canvasFetch(path) {
+  const res = await fetch(`https://${canvasDomain}/api/v1${path}`, {
+    headers: { 'Authorization': `Bearer ${canvasToken}` }
+  });
+  if (!res.ok) throw new Error(`Canvas API returned ${res.status}`);
+  return res.json();
+}
+
+async function fetchAllPages(path) {
+  let url = `https://${canvasDomain}/api/v1${path}`;
+  let all = [];
+  while (url) {
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${canvasToken}` } });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const data = await res.json();
+    all = all.concat(data);
+    const link = res.headers.get('Link') || '';
+    const next = link.match(/<([^>]+)>;\s*rel="next"/);
+    url = next ? next[1] : null;
+  }
+  return all;
+}
+
+async function fetchAssignments() {
+  setStatus('loading', 'Loading assignments...');
+  try {
+    const courseList = await canvasFetch('/courses?enrollment_state=active&per_page=50');
+    courses = {};
+    courseList.forEach(c => { if (c.name) courses[c.id] = c.name; });
+
+    const upcoming = await fetchAllPages('/users/self/upcoming_events?per_page=50');
+    let missing = [];
+    try { missing = await canvasFetch('/users/self/missing_submissions?per_page=50'); } catch(e) {}
+
+    assignments = [];
+    upcoming.forEach(ev => {
+      if (ev.assignment) {
+        assignments.push({
+          id: ev.assignment.id,
+          title: ev.title || ev.assignment.name,
+          due_at: ev.assignment.due_at,
+          lock_at: ev.assignment.lock_at || null,
+          course_id: ev.assignment.course_id,
+          points: ev.assignment.points_possible,
+          submission_types: ev.assignment.submission_types,
+          source: 'canvas'
+        });
+      }
+    });
+    missing.forEach(a => {
+      if (!assignments.find(x => x.id === a.id)) {
+        assignments.push({
+          id: a.id,
+          title: a.name,
+          due_at: a.due_at,
+          lock_at: a.lock_at || null,
+          course_id: a.course_id,
+          points: a.points_possible,
+          submission_types: a.submission_types,
+          source: 'missing'
+        });
+      }
+    });
+
+    populateCourseFilter();
+    populatePersonalCourseSelect();
+    document.getElementById('setupBanner').style.display = 'none';
+    document.getElementById('controlsRow').style.display = 'flex';
+    document.getElementById('addSection').style.display = 'block';
+    setStatus('connected', `Connected — ${assignments.length} assignments`);
+    renderTasks();
+  } catch(e) {
+    setStatus('error', 'Connection failed — check your domain and token');
+    console.error(e);
+  }
+}
+
+function shortenName(name, max) {
+  max = max || 38;
+  return name && name.length > max ? name.substring(0, max - 1) + '…' : name;
+}
+
+function populateCourseFilter() {
+  const sel = document.getElementById('filterCourse');
+  sel.innerHTML = '<option value="all">All courses</option>';
+  Object.entries(courses).forEach(([id, name]) => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = shortenName(name, 40);
+    sel.appendChild(opt);
+  });
+}
+
+function populatePersonalCourseSelect() {
+  const sel = document.getElementById('newTaskCourse');
+  sel.innerHTML = '<option value="">No course</option>';
+  Object.entries(courses).forEach(([id, name]) => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = shortenName(name, 40);
+    sel.appendChild(opt);
+  });
+}
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  return Math.floor((new Date(dateStr) - new Date()) / 86400000);
+}
+
+function formatDueDate(dateStr) {
+  if (!dateStr) return 'No due date';
+  const d = new Date(dateStr);
+  const today = new Date();
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function formatLockDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const today = new Date();
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (d.toDateString() === today.toDateString()) return `today ${time}`;
+  if (d.toDateString() === tomorrow.toDateString()) return `tomorrow ${time}`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + time;
+}
+
+function formatTime(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function daysAwayLabel(days) {
+  if (days === null) return { text: '', cls: '' };
+  if (days < 0) return { text: Math.abs(days) + 'd overdue', cls: 'overdue' };
+  if (days === 0) return { text: 'Due today', cls: 'today' };
+  if (days === 1) return { text: 'Due tomorrow', cls: 'soon' };
+  if (days <= 3) return { text: days + ' days', cls: 'soon' };
+  return { text: days + ' days', cls: '' };
+}
+
+function getIcon(types) {
+  if (!types || !types.length) return 'ti-file';
+  const t = types[0];
+  if (t === 'online_quiz') return 'ti-clipboard-check';
+  if (t === 'discussion_topic') return 'ti-message-circle';
+  if (t === 'online_upload') return 'ti-upload';
+  if (t === 'online_text_entry') return 'ti-text-size';
+  return 'ti-file';
+}
+
+function addPersonalTask() {
+  const title = document.getElementById('newTaskTitle').value.trim();
+  const date = document.getElementById('newTaskDate').value;
+  const courseId = document.getElementById('newTaskCourse').value;
+  if (!title) return;
+  personalTasks.push({
+    id: 'p_' + Date.now(),
+    title,
+    due_at: date ? date + 'T23:59:00' : null,
+    course_id: courseId || null,
+    source: 'personal'
+  });
+  document.getElementById('newTaskTitle').value = '';
+  saveState();
+  renderTasks();
+}
+
+function toggleDone(id) {
+  if (completedIds.has(id)) completedIds.delete(id);
+  else completedIds.add(id);
+  saveState();
+  renderTasks();
+}
+
+function renderTasks() {
+  const courseFilter = document.getElementById('filterCourse').value;
+  const statusFilter = document.getElementById('filterStatus').value;
+
+  let all = [...assignments, ...personalTasks];
+  if (courseFilter !== 'all') all = all.filter(t => String(t.course_id) === String(courseFilter));
+  if (statusFilter === 'pending') all = all.filter(t => !completedIds.has(t.id));
+  if (statusFilter === 'done') all = all.filter(t => completedIds.has(t.id));
+
+  all.sort((a, b) => {
+    if (!a.due_at && !b.due_at) return 0;
+    if (!a.due_at) return 1;
+    if (!b.due_at) return -1;
+    return new Date(a.due_at) - new Date(b.due_at);
+  });
+
+  const grouped = {};
+  all.forEach(t => {
+    const key = t.due_at ? new Date(t.due_at).toDateString() : 'No due date';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(t);
+  });
+
+  const pending = assignments.filter(t => !completedIds.has(t.id));
+  const overdue = pending.filter(t => t.due_at && daysUntil(t.due_at) < 0);
+  const thisWeek = pending.filter(t => { const d = daysUntil(t.due_at); return d !== null && d >= 0 && d <= 7; });
+
+  const strip = document.getElementById('summaryStrip');
+  if (assignments.length > 0) {
+    strip.style.display = 'flex';
+    strip.innerHTML =
+      `<div class="summary-chip"><span>${pending.length}</span> pending</div>` +
+      `<div class="summary-chip"><span>${thisWeek.length}</span> due this week</div>` +
+      (overdue.length > 0 ? `<div class="summary-chip danger"><span>${overdue.length}</span> overdue</div>` : '') +
+      `<div class="summary-chip"><span>${Object.keys(courses).length}</span> courses</div>`;
+  }
+
+  const list = document.getElementById('taskList');
+  if (Object.keys(grouped).length === 0) {
+    list.innerHTML = '<div class="empty-state"><i class="ti ti-mood-happy"></i>Nothing to show here</div>';
+    return;
+  }
+
+  list.innerHTML = Object.entries(grouped).map(([dateKey, tasks]) => {
+    const days = tasks[0].due_at ? daysUntil(tasks[0].due_at) : null;
+    const label = tasks[0].due_at ? formatDueDate(tasks[0].due_at) : 'No due date';
+    const away = daysAwayLabel(days);
+
+    const cards = tasks.map(t => {
+      const done = completedIds.has(t.id);
+      const courseName = t.course_id ? (courses[t.course_id] || '') : '';
+      const icon = t.source === 'personal' ? 'ti-pencil' : getIcon(t.submission_types);
+      const time = formatTime(t.due_at);
+      const lockLabel = t.lock_at ? formatLockDate(t.lock_at) : '';
+      const extraClass = t.source === 'missing' ? 'missing' : t.source === 'personal' ? 'personal' : '';
+      return `<div class="task-card ${done ? 'done' : ''} ${extraClass}">
+        <div class="task-check ${done ? 'checked' : ''}" onclick="toggleDone('${t.id}')" role="checkbox" aria-checked="${done}" aria-label="Mark complete" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')toggleDone('${t.id}')"></div>
+        <i class="ti ${icon} task-type-icon" aria-hidden="true"></i>
+        <div class="task-body">
+          <div class="task-title">${escHtml(t.title)}</div>
+          <div class="task-meta">
+            ${courseName ? `<span class="course-badge">${escHtml(shortenName(courseName, 36))}</span>` : ''}
+            ${time ? `<span class="time-badge"><i class="ti ti-clock" aria-hidden="true" style="font-size:11px;vertical-align:-1px"></i> ${time}</span>` : ''}
+            ${lockLabel ? `<span class="lock-badge"><i class="ti ti-lock" aria-hidden="true" style="font-size:11px;vertical-align:-1px"></i> closes ${lockLabel}</span>` : ''}
+            ${t.points ? `<span class="points-badge">${t.points} pts</span>` : ''}
+            ${t.source === 'missing' && !done ? `<span class="tag-missing">missing</span>` : ''}
+            ${t.source === 'personal' ? `<span class="tag-personal">personal</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="date-group">
+      <div class="date-header">
+        <span class="date-label">${label}</span>
+        ${away.text ? `<span class="days-away ${away.cls}">${away.text}</span>` : ''}
+        <span class="date-count">${tasks.length} item${tasks.length !== 1 ? 's' : ''}</span>
+      </div>
+      ${cards}
+    </div>`;
+  }).join('');
+}
+
+function clearSavedData() {
+  if (!confirm('Clear your saved token, personal tasks, and completed items?')) return;
+  localStorage.removeItem('canvas_token');
+  localStorage.removeItem('canvas_domain');
+  localStorage.removeItem('personal_tasks');
+  localStorage.removeItem('completed_ids');
+  location.reload();
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('newTaskDate').value = new Date().toISOString().split('T')[0];
+document.getElementById('domainInput').addEventListener('keydown', e => { if (e.key === 'Enter') connectCanvas(); });
+document.getElementById('tokenInput').addEventListener('keydown', e => { if (e.key === 'Enter') connectCanvas(); });
+
+if (canvasDomain) document.getElementById('domainInput').value = canvasDomain;
+if (canvasToken) document.getElementById('tokenInput').value = canvasToken;
+if (canvasDomain && canvasToken) {
+  setStatus('loading', 'Reconnecting...');
+  fetchAssignments();
+}
+</script>
+</body>
+</html>
