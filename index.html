@@ -364,8 +364,10 @@ async function connectCanvas() {
   await fetchAssignments();
 }
 
+const PROXY = 'https://canvas-tracker.netlify.app/.netlify/functions/proxy';
+
 async function canvasFetch(path) {
-  const res = await fetch(`https://${canvasDomain}/api/v1${path}`, {
+  const res = await fetch(`${PROXY}/api/v1${path}`, {
     headers: { 'Authorization': `Bearer ${canvasToken}` }
   });
   if (!res.ok) throw new Error(`Canvas API returned ${res.status}`);
@@ -373,10 +375,13 @@ async function canvasFetch(path) {
 }
 
 async function fetchAllPages(path) {
-  let url = `https://${canvasDomain}/api/v1${path}`;
+  let url = `${PROXY}/api/v1${path}`;
   let all = [];
   while (url) {
-    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${canvasToken}` } });
+    const proxyUrl = url.startsWith('https://mcpsmd.instructure.com')
+      ? url.replace('https://mcpsmd.instructure.com', PROXY)
+      : url;
+    const res = await fetch(proxyUrl, { headers: { 'Authorization': `Bearer ${canvasToken}` } });
     if (!res.ok) throw new Error(`${res.status}`);
     const data = await res.json();
     all = all.concat(data);
