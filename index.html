@@ -52,6 +52,32 @@
       --color-success-text: #97c459;
     }
   }
+  .login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 2rem 1rem;
+  }
+  .login-card {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    width: 100%; max-width: 340px;
+    text-align: center;
+  }
+  .login-card h2 { font-size: 18px; font-weight: 500; margin-bottom: 6px; color: var(--text-primary); }
+  .login-card p { font-size: 13px; color: var(--text-secondary); margin-bottom: 1.25rem; }
+  .login-card input {
+    width: 100%; padding: 9px 12px; font-size: 14px;
+    font-family: var(--font);
+    background: var(--bg-secondary);
+    border: 0.5px solid var(--border-mid);
+    border-radius: var(--radius-md);
+    color: var(--text-primary); outline: none;
+    margin-bottom: 10px; text-align: center;
+  }
+  .login-card input:focus { border-color: var(--border-strong); }
+  .login-card button { width: 100%; padding: 9px; font-size: 14px; justify-content: center; }
+  .login-error { font-size: 12px; color: var(--color-danger-text); margin-top: 8px; min-height: 16px; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: var(--font);
@@ -317,7 +343,17 @@
 </style>
 </head>
 <body>
-<div class="app">
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <h2><i class="ti ti-checklist" style="vertical-align:-2px"></i> Canvas task tracker</h2>
+    <p>Enter the passphrase to continue</p>
+    <input type="password" id="loginInput" placeholder="Passphrase" onkeydown="if(event.key==='Enter')doLogin()" autofocus />
+    <button onclick="doLogin()"><i class="ti ti-lock-open"></i> Unlock</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div class="app" id="mainApp" style="display:none">
   <div class="header">
     <h1><i class="ti ti-checklist"></i> Canvas task tracker</h1>
     <div class="status-row">
@@ -373,8 +409,31 @@
     </div>
   </div>
 </div>
+</div>
 
 <script>
+const PASSPHRASE = 'MyTrackerApp123';
+
+function doLogin() {
+  const val = document.getElementById('loginInput').value;
+  if (val === PASSPHRASE) {
+    localStorage.setItem('tracker_auth', '1');
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    document.getElementById('loginInput').value = '';
+  } else {
+    document.getElementById('loginError').textContent = 'Incorrect passphrase';
+    document.getElementById('loginInput').value = '';
+    document.getElementById('loginInput').focus();
+  }
+}
+
+// Check if already authenticated
+if (localStorage.getItem('tracker_auth') === '1') {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+}
+
 const LS = {
   get: (k, fallback) => { try { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : fallback; } catch(e) { return fallback; } },
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
@@ -782,6 +841,7 @@ function clearSavedData() {
   localStorage.removeItem('canvas_domain');
   localStorage.removeItem('personal_tasks');
   localStorage.removeItem('completed_ids');
+  localStorage.removeItem('tracker_auth');
   location.reload();
 }
 
