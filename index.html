@@ -757,6 +757,7 @@ function toggleDone(id) {
 }
 
 function renderTasks() {
+  const now = new Date();
   const selectedCourses = getSelectedCourseIds();
   const statusFilter = document.getElementById('filterStatus').value;
 
@@ -787,7 +788,6 @@ function renderTasks() {
   if (statusFilter === 'done') all = all.filter(t => completedIds.has(t.id));
 
   // Split into upcoming/personal and overdue/missing
-  const now = new Date();
   const upcoming = all.filter(t => t.source !== 'missing' && (!t.due_at || new Date(t.due_at) >= now));
   const overdueMissing = all.filter(t => t.source === 'missing' || (t.due_at && new Date(t.due_at) < now && t.source === 'canvas'));
 
