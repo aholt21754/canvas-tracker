@@ -428,9 +428,10 @@
       </div>
     </div>
     <select id="filterStatus" onchange="renderTasks()">
-      <option value="pending">Pending</option>
+      <option value="active">Active</option>
+      <option value="closed">Closed</option>
       <option value="all">All</option>
-      <option value="done">Completed</option>
+      <option value="done">Done</option>
     </select>
     <button class="refresh-btn" onclick="fetchAssignments(true)"><i class="ti ti-refresh" style="font-size:13px"></i> Refresh</button>
     <button class="refresh-btn" onclick="clearSavedData()" style="color:var(--color-danger-text);border-color:var(--color-danger-border)" title="Clear saved token and tasks"><i class="ti ti-trash" style="font-size:13px"></i> Clear saved data</button>
@@ -601,12 +602,17 @@ function shortenName(name, max) {
 function populateCourseFilter() {
   const container = document.getElementById('courseOptions');
   container.innerHTML = '';
+  const saved = LS.get('course_filter', null); // null means all selected
   Object.entries(courses).forEach(([id, name]) => {
+    const isChecked = saved === null || saved.includes(String(id));
     const label = document.createElement('label');
     label.className = 'multi-select-option';
-    label.innerHTML = `<input type="checkbox" value="${id}" onchange="handleCourseOption(this)" checked> ${escHtml(shortenName(name, 40))}`;
+    label.innerHTML = `<input type="checkbox" value="${id}" onchange="handleCourseOption(this)" ${isChecked ? 'checked' : ''}> ${escHtml(shortenName(name, 40))}`;
     container.appendChild(label);
   });
+  // Sync the All checkbox
+  const boxes = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+  document.getElementById('courseAll').checked = boxes.every(b => b.checked);
   updateCourseFilterLabel();
 }
 
@@ -618,6 +624,7 @@ function toggleCourseDropdown() {
 function handleCourseAll(cb) {
   const boxes = document.querySelectorAll('#courseOptions input[type="checkbox"]');
   boxes.forEach(b => b.checked = cb.checked);
+  saveCourseFilter();
   updateCourseFilterLabel();
   renderTasks();
 }
@@ -628,6 +635,7 @@ function handleCourseOption(cb) {
   const noneChecked = boxes.every(b => !b.checked);
   document.getElementById('courseAll').checked = allChecked;
   if (noneChecked) { cb.checked = true; } // prevent deselecting all
+  saveCourseFilter();
   updateCourseFilterLabel();
   renderTasks();
 }
@@ -656,6 +664,11 @@ function getSelectedCourseIds() {
   if (allBox.checked) return null; // null = all
   const boxes = Array.from(document.querySelectorAll('#courseOptions input[type="checkbox"]'));
   return boxes.filter(b => b.checked).map(b => b.value);
+}
+
+function saveCourseFilter() {
+  const selected = getSelectedCourseIds();
+  LS.set('course_filter', selected); // null = all courses
 }
 
 function populatePersonalCourseSelect() {
@@ -751,7 +764,26 @@ function renderTasks() {
   if (selectedCourses !== null) {
     all = all.filter(t => t.course_id && selectedCourses.includes(String(t.course_id)));
   }
-  if (statusFilter === 'pending') all = all.filter(t => !completedIds.has(t.id));
+  if (statusFilter === 'active') {
+    // Active: not completed, and either due in future OR overdue but still accepting submissions
+    all = all.filter(t => {
+      if (completedIds.has(t.id)) return false;
+      if (t.source === 'personal') return true;
+      const isUpcoming = !t.due_at || new Date(t.due_at) >= now;
+      const isStillOpen = t.source === 'missing' && t.lock_at && new Date(t.lock_at) > now;
+      return isUpcoming || isStillOpen;
+    });
+  }
+  if (statusFilter === 'closed') {
+    // Closed: overdue AND no longer accepting submissions (or no lock date)
+    all = all.filter(t => {
+      if (completedIds.has(t.id)) return false;
+      if (t.source === 'personal') return false;
+      const isOverdue = t.due_at && new Date(t.due_at) < now;
+      const isClosed = !t.lock_at || new Date(t.lock_at) <= now;
+      return isOverdue && isClosed;
+    });
+  }
   if (statusFilter === 'done') all = all.filter(t => completedIds.has(t.id));
 
   // Split into upcoming/personal and overdue/missing
@@ -792,7 +824,7 @@ function renderTasks() {
   if (assignments.length > 0) {
     strip.style.display = 'flex';
     strip.innerHTML =
-      `<div class="summary-chip"><span>${pending.length}</span> pending</div>` +
+      `<div class="summary-chip"><span>${pending.length}</span> active</div>` +
       `<div class="summary-chip info"><span>${thisWeek.length}</span> due in 7 days</div>` +
       (overdueCount > 0 ? `<div class="summary-chip danger"><span>${overdueCount}</span> overdue</div>` : '') +
       `<div class="summary-chip"><span>${courseCount}</span> course${courseCount !== 1 ? 's' : ''}</div>`;
@@ -852,7 +884,7 @@ function renderTasks() {
 
   if (overdueMissing.length > 0) {
     const visibleMissing = overdueMissing.filter(t => !completedIds.has(t.id));
-    if (visibleMissing.length > 0 || statusFilter === 'done') {
+    if (visibleMissing.length > 0 || statusFilter === 'all' || statusFilter === 'done') {
       // Split: still submittable (lock_at in the future) vs fully closed
       const stillOpen = overdueMissing
         .filter(t => t.lock_at && new Date(t.lock_at) > now)
@@ -891,6 +923,7 @@ function clearSavedData() {
   localStorage.removeItem('personal_tasks');
   localStorage.removeItem('completed_ids');
   localStorage.removeItem('tracker_auth');
+  localStorage.removeItem('course_filter');
   location.reload();
 }
 
