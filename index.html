@@ -384,7 +384,7 @@
 <body>
 <div class="login-screen" id="loginScreen">
   <div class="login-card">
-    <h2><i class="ti ti-checklist" style="vertical-align:-2px"></i> Canvas task tracker</h2>
+    <h2><i class="ti ti-checklist" style="vertical-align:-2px"></i> Canvas Task Tracker</h2>
     <p>Enter the passphrase to continue</p>
     <input type="password" id="loginInput" placeholder="Passphrase" onkeydown="if(event.key==='Enter')doLogin()" autofocus />
     <button onclick="doLogin()"><i class="ti ti-lock-open"></i> Unlock</button>
@@ -394,10 +394,11 @@
 
 <div class="app" id="mainApp" style="display:none">
   <div class="header">
-    <h1><i class="ti ti-checklist"></i> Canvas task tracker</h1>
+    <h1><i class="ti ti-checklist"></i> Canvas Task Tracker</h1>
     <div class="status-row">
       <div class="status-dot" id="statusDot"></div>
       <span id="statusText">Not connected</span>
+      <a href="#add-task" id="addTaskLink" onclick="focusAddTask()" style="display:none;margin-left:10px;font-size:13px;color:#e6f1fb;text-decoration:none;background:#185fa5;border:none;border-radius:var(--radius-md);padding:6px 12px;white-space:nowrap;display:none;align-items:center;gap:5px"><i class="ti ti-pencil" style="font-size:13px;vertical-align:-1px"></i> Add task</a>
     </div>
   </div>
 
@@ -439,7 +440,7 @@
 
   <div id="taskList"></div>
 
-  <div id="addSection" class="add-section" style="display:none">
+  <div id="addSection" class="add-section" style="display:none"><a name="add-task"></a>
     <h3>Add a personal task</h3>
     <div class="add-row">
       <input type="text" id="newTaskTitle" placeholder="Task name..." />
@@ -484,7 +485,7 @@ let canvasDomain = LS.get('canvas_domain', '');
 let assignments = [];
 let personalTasks = LS.get('personal_tasks', []);
 let courses = {};
-let completedIds = new Set(LS.get('completed_ids', []));
+let completedIds = new Set((LS.get('completed_ids', [])).map(String));
 
 function saveState() {
   LS.set('personal_tasks', personalTasks);
@@ -553,7 +554,7 @@ async function fetchAssignments(refreshOnly = false) {
     upcoming.forEach(ev => {
       if (ev.assignment) {
         assignments.push({
-          id: ev.assignment.id,
+          id: String(ev.assignment.id),
           title: ev.title || ev.assignment.name,
           due_at: ev.assignment.due_at,
           lock_at: ev.assignment.lock_at || null,
@@ -567,7 +568,7 @@ async function fetchAssignments(refreshOnly = false) {
     missing.forEach(a => {
       if (!assignments.find(x => x.id === a.id)) {
         assignments.push({
-          id: a.id,
+          id: String(a.id),
           title: a.name,
           due_at: a.due_at,
           lock_at: a.lock_at || null,
@@ -585,6 +586,7 @@ async function fetchAssignments(refreshOnly = false) {
       document.getElementById('setupBanner').style.display = 'none';
       document.getElementById('controlsRow').style.display = 'flex';
       document.getElementById('addSection').style.display = 'block';
+      document.getElementById('addTaskLink').style.display = 'inline-flex'; document.getElementById('addTaskLink').style.alignItems = 'center';
     }
     setStatus('connected', `Connected — ${assignments.length} assignments`);
     renderTasks();
@@ -749,6 +751,13 @@ function addPersonalTask() {
   renderTasks();
 }
 
+function focusAddTask() {
+  setTimeout(() => {
+    const input = document.getElementById('newTaskTitle');
+    if (input) input.focus();
+  }, 300);
+}
+
 function toggleDone(id) {
   if (completedIds.has(id)) completedIds.delete(id);
   else completedIds.add(id);
@@ -824,10 +833,8 @@ function renderTasks() {
   if (assignments.length > 0) {
     strip.style.display = 'flex';
     strip.innerHTML =
-      `<div class="summary-chip"><span>${pending.length}</span> active</div>` +
       `<div class="summary-chip info"><span>${thisWeek.length}</span> due in 7 days</div>` +
-      (overdueCount > 0 ? `<div class="summary-chip danger"><span>${overdueCount}</span> overdue</div>` : '') +
-      `<div class="summary-chip"><span>${courseCount}</span> course${courseCount !== 1 ? 's' : ''}</div>`;
+      (overdueCount > 0 ? `<div class="summary-chip danger"><span>${overdueCount}</span> overdue</div>` : '');
   }
 
   const list = document.getElementById('taskList');
